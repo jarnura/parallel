@@ -1,4 +1,7 @@
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
+use crate::pooling::instrument;
+
+#[cfg(any(feature = "diesel", feature = "sqlx"))]
 use crate::{models, pooling};
 
 #[cfg(feature = "diesel")]
@@ -19,6 +22,14 @@ impl Reads {
             .await
             .expect("Error loading payment_intent")
     }
+
+    pub async fn read_pi_with_instrument(
+        store: &pooling::DieselAsync,
+        pid: String,
+        ix: i8,
+    ) -> models::PaymentIntent {
+        instrument(|| Self::read_pi(store, pid), ix).await
+    }
 }
 
 #[cfg(feature = "sqlx")]
@@ -35,5 +46,13 @@ impl Reads {
         .await
         .expect("Error loading payment_intent");
         pi
+    }
+
+    pub async fn read_pi_with_instrument(
+        store: &pooling::SqlxAsync,
+        pid: String,
+        ix: i8,
+    ) -> models::PaymentIntent {
+        instrument(|| Self::read_pi(store, pid), ix).await
     }
 }

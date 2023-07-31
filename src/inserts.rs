@@ -1,6 +1,8 @@
 #[cfg(feature = "diesel")]
 use async_bb8_diesel::AsyncRunQueryDsl;
-use time::{OffsetDateTime, PrimitiveDateTime};
+
+#[cfg(any(feature = "diesel", feature = "sqlx"))]
+use crate::pooling::instrument;
 
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
 use crate::{models, pooling};
@@ -14,7 +16,7 @@ pub struct Inserts;
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
 impl Inserts {
     fn make_pi() -> models::PaymentIntentNew {
-        let created_at @ modified_at = Some(current_time());
+        let created_at @ modified_at = Some(pooling::current_time());
         models::PaymentIntentNew {
             created_at,
             modified_at,
@@ -38,15 +40,11 @@ impl Inserts {
             .expect("Unable to insert")
     }
 
-    pub async fn insert_pi_with_instrument(store: &pooling::DieselAsync, i_x: i8) -> models::PaymentIntent {
-        println!("pi entering {}", i_x);
-        let start_time = current_time();
-        // let pi = Self::insert_pi(self.store.master_pool.into()).await;
-        let pi = Self::insert_pi(store).await;
-        let end_time = current_time();
-        println!("{}", end_time - start_time);
-        println!("pi exit {}", i_x);
-        pi
+    pub async fn insert_pi_with_instrument(
+        store: &pooling::DieselAsync,
+        ix: i8,
+    ) -> models::PaymentIntent {
+        instrument(|| Self::insert_pi(store), ix).await
     }
 }
 
@@ -77,19 +75,10 @@ impl Inserts {
         .expect("Unable to insert")
     }
 
-    pub async fn insert_pi_with_instrument(store: &pooling::SqlxAsync, i_x: i8) -> models::PaymentIntent {
-        println!("pi entering {}", i_x);
-        let start_time = current_time();
-        // let pi = Self::insert_pi(self.store.master_pool.into()).await;
-        let pi = Self::insert_pi(store).await;
-        let end_time = current_time();
-        println!("{}", end_time - start_time);
-        println!("pi exit {}", i_x);
-        pi
+    pub async fn insert_pi_with_instrument(
+        store: &pooling::SqlxAsync,
+        ix: i8,
+    ) -> models::PaymentIntent {
+        instrument(|| Self::insert_pi(store), ix).await
     }
-}
-
-pub fn current_time() -> PrimitiveDateTime {
-    let utc_date_time = OffsetDateTime::now_utc();
-    PrimitiveDateTime::new(utc_date_time.date(), utc_date_time.time())
 }
