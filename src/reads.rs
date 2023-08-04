@@ -1,5 +1,5 @@
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
-use crate::pooling::instrument;
+use crate::utils::instrument;
 
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
 use crate::{models, pooling};

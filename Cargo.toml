@@ -25,3 +25,12 @@ serde = { version = "1.0.173", features = ["derive"] }
 time = { version = "0.3.23", features = ["serde", "serde-well-known", "std"] }
 actix-rt = "2.8.0"
 futures = "0.3.28"
+env_logger = "0.10.0"
+
+[[bin]]
+name = "dbbench"
+path = "src/main.rs"
+
+[profile.release]
+lto = true
+codegen-units = 1

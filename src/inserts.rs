@@ -2,7 +2,10 @@
 use async_bb8_diesel::AsyncRunQueryDsl;
 
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
-use crate::pooling::instrument;
+use crate::utils;
+
+#[cfg(any(feature = "diesel", feature = "sqlx"))]
+use crate::utils::instrument;
 
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
 use crate::{models, pooling};
@@ -16,7 +19,7 @@ pub struct Inserts;
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
 impl Inserts {
     fn make_pi() -> models::PaymentIntentNew {
-        let created_at @ modified_at = Some(pooling::current_time());
+        let created_at @ modified_at = Some(utils::current_time());
         models::PaymentIntentNew {
             created_at,
             modified_at,

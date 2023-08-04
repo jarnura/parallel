@@ -1,15 +1,22 @@
-use time::{OffsetDateTime, PrimitiveDateTime};
+// use async_trait::async_trait;
+// use time::{OffsetDateTime, PrimitiveDateTime};
 
-pub struct Store<T>
-where
-    T: DatabasePooling,
-{
-    pub master_pool: T::ConnectionPool,
-}
+// #[async_trait]
+// pub trait Store {
+//     async fn get_connection_from_store(&self) -> <Self as DatabasePooling>::PooledConnection<'_> where Self: DatabasePooling {
+//         self.get_connection().await
+//     }
+// }
+
+// impl Store for SqlxAsync {}
 
 pub async fn get_connection<T: DatabasePooling>(pool: &T) -> T::PooledConnection<'_> {
     T::get_connection(pool).await
 }
+
+// pub async fn get_connection_from_store<T: DatabasePooling>(store: &Store<T>) -> T::PooledConnection<'_> {
+//     store.master_pool
+// }
 
 #[async_trait::async_trait]
 pub trait DatabasePooling {
@@ -24,6 +31,7 @@ pub trait DatabasePooling {
 }
 
 #[cfg(feature = "diesel")]
+#[derive(Clone)]
 pub struct DieselAsync {
     pool: bb8::Pool<async_bb8_diesel::ConnectionManager<diesel::PgConnection>>,
 }
@@ -102,25 +110,6 @@ impl DatabasePooling for SqlxAsync {
     async fn get_connection(&self) -> Self::PooledConnection<'_> {
         &self.pool
     }
-}
-
-pub fn current_time() -> PrimitiveDateTime {
-    let utc_date_time = OffsetDateTime::now_utc();
-    PrimitiveDateTime::new(utc_date_time.date(), utc_date_time.time())
-}
-
-pub async fn instrument<F, Fut, B>(func: F, ix: i8) -> B
-where
-    F: FnOnce() -> Fut + Send,
-    Fut: futures::Future<Output = B> + Send,
-{
-    println!("pi entering {}", ix);
-    let start_time = current_time();
-    let result = func().await;
-    let end_time = current_time();
-    println!("{}", end_time - start_time);
-    println!("pi exit {}", ix);
-    result
 }
 
 // impl From<sqlx::Pool<sqlx::Postgres>> for SqlxAsync {

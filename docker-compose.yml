@@ -1,0 +1,54 @@
+version: "3.7"
+
+volumes:
+  pg_data:
+  cargo_cache:
+  cargo_build_cache:
+
+services:
+  migration_runner:
+    depends_on:
+      pg:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: DockerfileM
+
+  pg:
+    image: postgres:14.5
+    ports:
+      - "5432"
+    volumes:
+      - pg_data:/VAR/LIB/POSTGRESQL/DATA
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=diesel_demo
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  db-bench:
+    depends_on:
+      - migration_runner
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8080:8080
+    volumes:
+      - ./:/app
+      - cargo_cache:/cargo_cache
+      - cargo_build_cache:/cargo_build_cache
+    environment:
+      - CARGO_TARGET_DIR=/cargo_build_cache
+      - DATABASE_URL=postgres://postgres:postgres@pg/diesel_demo
+    healthcheck:
+      test: curl --fail http://localhost:8080 || exit 1
+      interval: 5s
+      retries: 5
+      start_period: 5s
+      timeout: 5s
