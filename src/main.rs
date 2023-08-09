@@ -42,7 +42,7 @@ async fn main() -> std::io::Result<()> {
                 .app_data(web::Data::new(store.clone()))
                 .route("/", web::get().to(executor))
         })
-        .bind(("0.0.0.0", 8080))?
+        .bind(("0.0.0.0", 8082))?
         .run()
         .await
     };

@@ -37,7 +37,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - 8080:8080
+      - 8082:8082
     volumes:
       - ./:/app
       - cargo_cache:/cargo_cache
@@ -46,8 +46,8 @@ services:
       - CARGO_TARGET_DIR=/cargo_build_cache
       - DATABASE_URL=postgres://postgres:postgres@pg/diesel_demo
     healthcheck:
-      test: curl --fail http://localhost:8080 || exit 1
-      interval: 5s
+      test: curl --fail http://localhost:8082 || exit 1
+      interval: 15s
       retries: 5
       start_period: 5s
       timeout: 5s
@@ -91,19 +91,65 @@ services:
         - --config.file=/etc/prometheus/prometheus.yml
     volumes:
         - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - cadvisor
   
   grafana:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
     restart: unless-stopped
+    labels:
+      container_group: monitoring
+    # logging:
+    #   driver: gelf
+    #   options:
+    #     gelf-address: udp://172.16.0.38:12201
+    #     labels: container_group
+
     environment:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_BASIC_ENABLED=false
     volumes:
-      - ./grafana.ini:/etc/grafana/grafana.ini
-      - ./grafana-datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./grafana/grafana-datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/grafana-dashboard.yaml:/etc/grafana/provisioning/dashboards/dashboard.yaml
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.1
+    container_name: cadvisor
+    privileged: true
+    ports:
+    - 8080:8080
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:rw
+    - /var/run:/var/run:rw
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+    - /etc/machine-id:/etc/machine-id:ro
+    - /var/lib/dbus/machine-id:/var/lib/dbus/machine-id:ro
+    depends_on:
+    - redis
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+    - 6379:6379
+  
+  master-nodeexporter:
+    image: prom/node-exporter:v0.14.0
+    ports:
+      - "9100:9100"
+    restart: always
+    labels:
+      container_group: monitoring
+    # logging:
+    #   driver: gelf
+    #   options:
+    #     gelf-address: udp://172.16.0.38:12201
+    #     labels: container_group
 
   fe:
     image: novyl/jtl-reporter-fe:v4.8.6
@@ -135,7 +181,7 @@ services:
     environment:
       - DB_HOST=db
       - JWT_TOKEN=27JU4qy73hchTMLoH8w9m
-      - JWT_TOKEN_LOGIN=xxx  # create a token from dashboard and configure here
+      - JWT_TOKEN_LOGIN=at-c6502007-0c7e-47fd-a17e-f7d0ad926476  # create a token from dashboard and configure here
 
   migration:
     image: novyl/jtl-reporter-be:v4.8.6
@@ -153,7 +199,7 @@ services:
       - "6000:6000"
     environment:
       - DB_HOST=db
-      - JWT_TOKEN=xxx # paste the same token as in be service - JWT_TOKEN_LOGIN
+      - JWT_TOKEN=at-c6502007-0c7e-47fd-a17e-f7d0ad926476 # paste the same token as in be service - JWT_TOKEN_LOGIN
 
   scheduler:
     image: novyl/jtl-reporter-scheduler:v0.0.4
