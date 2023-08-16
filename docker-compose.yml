@@ -25,7 +25,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=diesel_demo
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,8 +36,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        MODE: ${MODE}
+        DATABASE_URL: ${DATABASE_URL}
     ports:
-      - 8082:8082
+      - 8082:8080
     volumes:
       - ./:/app
       - cargo_cache:/cargo_cache
@@ -63,7 +66,7 @@ services:
       - ./:/mnt/locust
     command: -f /mnt/locust/locust_home.py --master -H http://locust-master:8089
     environment:
-      - JTL_API_TOKEN=at-c6502007-0c7e-47fd-a17e-f7d0ad926476
+      - JTL_API_TOKEN=at-ed78f00c-a43d-48b8-bf2a-b616e53be118
 
   locust-worker:
     image: locustio/locust
@@ -71,7 +74,9 @@ services:
       - ./:/mnt/locust
     command: -f /mnt/locust/locust_home.py --worker --master-host locust-master
     environment:
-      - JTL_API_TOKEN=at-c6502007-0c7e-47fd-a17e-f7d0ad926476
+      - JTL_API_TOKEN=at-ed78f00c-a43d-48b8-bf2a-b616e53be118
+    depends_on:
+      - locust-master
 
   locust-exporter:
     image: containersol/locust_exporter
@@ -132,6 +137,7 @@ services:
     - /var/lib/dbus/machine-id:/var/lib/dbus/machine-id:ro
     depends_on:
     - redis
+  
   redis:
     image: redis:latest
     container_name: redis
@@ -181,7 +187,7 @@ services:
     environment:
       - DB_HOST=db
       - JWT_TOKEN=27JU4qy73hchTMLoH8w9m
-      - JWT_TOKEN_LOGIN=at-c6502007-0c7e-47fd-a17e-f7d0ad926476  # create a token from dashboard and configure here
+      - JWT_TOKEN_LOGIN=at-ed78f00c-a43d-48b8-bf2a-b616e53be118  # create a token from dashboard and configure here
 
   migration:
     image: novyl/jtl-reporter-be:v4.8.6
@@ -199,7 +205,7 @@ services:
       - "6000:6000"
     environment:
       - DB_HOST=db
-      - JWT_TOKEN=at-c6502007-0c7e-47fd-a17e-f7d0ad926476 # paste the same token as in be service - JWT_TOKEN_LOGIN
+      - JWT_TOKEN=at-ed78f00c-a43d-48b8-bf2a-b616e53be118 # paste the same token as in be service - JWT_TOKEN_LOGIN
 
   scheduler:
     image: novyl/jtl-reporter-scheduler:v0.0.4

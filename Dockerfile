@@ -19,12 +19,15 @@ ENV RUST_BACKTRACE="short"
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
 
 ARG MODE=diesel
+ARG DATABASE_URL
 
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --recipe-path recipe.json
 
 COPY . .
-RUN cargo build --features ${MODE}
+
+ENV DATABASE_URL=${DATABASE_URL}
+RUN cargo build --release --features ${MODE}
 
 FROM debian:bookworm-slim
 
@@ -38,7 +41,7 @@ EXPOSE 8080
 
 RUN mkdir -p ${BIN_DIR}
 
-COPY --from=builder /app/target/debug/dbbench ${BIN_DIR}/dbbench
+COPY --from=builder /app/target/release/dbbench ${BIN_DIR}/dbbench
 
 WORKDIR ${BIN_DIR}
 
