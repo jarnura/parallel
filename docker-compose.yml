@@ -25,7 +25,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=diesel_demo
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,8 +36,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - MODE=${MODE}
+        - DATABASE_URL=${DATABASE_URL}
     ports:
-      - 8082:8082
+      - 8082:8080
     volumes:
       - ./:/app
       - cargo_cache:/cargo_cache
@@ -46,7 +49,7 @@ services:
       - CARGO_TARGET_DIR=/cargo_build_cache
       - DATABASE_URL=postgres://postgres:postgres@pg/diesel_demo
     healthcheck:
-      test: curl --fail http://localhost:8082 || exit 1
+      test: curl --fail http://localhost:8080 || exit 1
       interval: 15s
       retries: 5
       start_period: 5s
@@ -72,6 +75,8 @@ services:
     command: -f /mnt/locust/locust_home.py --worker --master-host locust-master
     environment:
       - JTL_API_TOKEN=at-c6502007-0c7e-47fd-a17e-f7d0ad926476
+    depends_on:
+      - locust_master
 
   locust-exporter:
     image: containersol/locust_exporter
