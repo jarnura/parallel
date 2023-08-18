@@ -27,7 +27,8 @@ RUN cargo chef cook --recipe-path recipe.json
 COPY . .
 
 ENV DATABASE_URL=${DATABASE_URL}
-RUN cargo build --release --features ${MODE}
+
+RUN cargo build --features ${MODE}
 
 FROM debian:bookworm-slim
 
