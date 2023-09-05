@@ -18,7 +18,8 @@ ENV RUSTUP_MAX_RETRIES=2
 ENV RUST_BACKTRACE="short"
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
 
-ARG MODE=diesel
+ARG DB_MODE=diesel
+ARG SERVER_MODE=actix
 ARG DATABASE_URL
 
 COPY --from=planner /app/recipe.json recipe.json
@@ -28,7 +29,7 @@ COPY . .
 
 ENV DATABASE_URL=${DATABASE_URL}
 
-RUN cargo build --features ${MODE}
+RUN cargo build --release --features "${DB_MODE},${SERVER_MODE}"
 
 FROM debian:bookworm-slim
 
