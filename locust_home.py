@@ -8,7 +8,7 @@ import json
 
 class UserBehavior(SequentialTaskSet):
     @task(1)
-    def test(self):
+    def parallel_db_calls(self):
         self.client.get('/')
 
 

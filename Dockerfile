@@ -29,6 +29,8 @@ COPY . .
 
 ENV DATABASE_URL=${DATABASE_URL}
 
+RUN echo $DATABASE_URL
+
 RUN cargo build --release --features "${DB_MODE},${SERVER_MODE}"
 
 FROM debian:bookworm-slim

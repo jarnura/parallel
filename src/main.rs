@@ -16,6 +16,7 @@ use parallel::{inserts::Inserts, pooling, reads::Reads};
 #[cfg(feature = "diesel")]
 async fn init(database_url: &str) -> pooling::DieselAsync {
     dotenv().ok();
+    println!("DIESEL");
 
     pooling::DieselAsync::new(database_url).await
 }
@@ -23,6 +24,7 @@ async fn init(database_url: &str) -> pooling::DieselAsync {
 #[cfg(feature = "sqlx")]
 async fn init(database_url: &str) -> pooling::SqlxAsync {
     dotenv().ok();
+    println!("SQLX");
 
     pooling::SqlxAsync::new(database_url).await
 }
@@ -32,6 +34,9 @@ async fn init(database_url: &str) -> pooling::SqlxAsync {
 async fn main() -> std::io::Result<()> {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     #[cfg(any(feature = "diesel", feature = "sqlx"))]
+    
+    println!("{database_url}");
+    println!("AXUM");
     let store = init(&database_url).await;
     let app = axum::Router::new()
         .route("/", axum::routing::get(executor))
@@ -55,6 +60,7 @@ async fn main() -> std::io::Result<()> {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     println!("{database_url}");
+    println!("ACTIX");
 
     #[cfg(any(feature = "diesel", feature = "sqlx"))]
     let _ = {

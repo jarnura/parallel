@@ -4,6 +4,7 @@ scrape_configs:
     static_configs:
       - targets:
           - locust-exporter:9646
+          - locust-exporter-seq:9648
 
   - job_name: "node"
     scrape_interval: 10s

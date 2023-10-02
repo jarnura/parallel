@@ -17,7 +17,7 @@ services:
   pg:
     image: postgres:14.5
     ports:
-      - "5432"
+      - "5434:5432"
     volumes:
       - pg_data:/VAR/LIB/POSTGRESQL/DATA
     environment:
@@ -67,7 +67,7 @@ services:
         condition: service_healthy
     volumes:
       - ./:/mnt/locust
-    command: -f /mnt/locust/locust_home.py --master -H http://locust-master:8089
+    command: -f /mnt/locust/locust_payment.py --master -H http://locust-master:8089
     environment:
       - JTL_API_TOKEN=at-ed78f00c-a43d-48b8-bf2a-b616e53be118
 
@@ -75,7 +75,7 @@ services:
     image: locustio/locust
     volumes:
       - ./:/mnt/locust
-    command: -f /mnt/locust/locust_home.py --worker --master-host locust-master
+    command: -f /mnt/locust/locust_payment.py --worker --master-host locust-master
     environment:
       - JTL_API_TOKEN=at-ed78f00c-a43d-48b8-bf2a-b616e53be118
     depends_on:
@@ -89,6 +89,38 @@ services:
         - LOCUST_EXPORTER_URI=http://locust-master:8089
     depends_on:
         - locust-master
+  
+  locust-master-seq:
+    image: locustio/locust
+    ports:
+     - "8091:8089"
+    depends_on:
+      db-bench:
+        condition: service_healthy
+    volumes:
+      - ./:/mnt/locust
+    command: -f /mnt/locust/locust_seq.py --master -H http://locust-master:8091
+    environment:
+      - JTL_API_TOKEN=at-ed78f00c-a43d-48b8-bf2a-b616e53be118
+
+  locust-worker-seq:
+    image: locustio/locust
+    volumes:
+      - ./:/mnt/locust
+    command: -f /mnt/locust/locust_seq.py --worker --master-host locust-master-seq
+    environment:
+      - JTL_API_TOKEN=at-ed78f00c-a43d-48b8-bf2a-b616e53be118
+    depends_on:
+      - locust-master-seq
+
+  locust-exporter-seq:
+    image: containersol/locust_exporter
+    ports:
+        - "9648:9646"
+    environment:
+        - LOCUST_EXPORTER_URI=http://locust-master:8091
+    depends_on:
+        - locust-master-seq
   
   prometheus:
     image: prom/prometheus:latest

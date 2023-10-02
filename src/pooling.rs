@@ -42,7 +42,7 @@ impl DieselAsync {
     where
         Self: DatabasePooling,
     {
-        let pool = Self::build_pool(database_url, 10).await;
+        let pool = Self::build_pool(database_url, 20).await;
         Self { pool }
     }
 }
@@ -85,7 +85,7 @@ impl SqlxAsync {
     where
         Self: DatabasePooling,
     {
-        let pool = Self::build_pool(database_url, 10).await;
+        let pool = Self::build_pool(database_url, 20).await;
         Self { pool }
     }
 }
