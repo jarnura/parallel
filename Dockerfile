@@ -10,6 +10,8 @@ FROM chef as builder
 RUN apt-get update \
     && apt-get install -y libpq-dev libssl-dev pkg-config
 
+RUN cargo install --locked tokio-console
+
 WORKDIR /app
 
 ENV CARGO_INCREMENTAL=0
@@ -29,9 +31,7 @@ COPY . .
 
 ENV DATABASE_URL=${DATABASE_URL}
 
-RUN cargo build --release --features "${DB_MODE},${SERVER_MODE}"
-
-RUN cargo install --locked tokio-console
+RUN RUSTFLAGS="--cfg tokio_unstable" cargo build --release --features "${DB_MODE},${SERVER_MODE}"
 
 FROM debian:bookworm-slim
 
@@ -48,6 +48,8 @@ EXPOSE 5555
 RUN mkdir -p ${BIN_DIR}
 
 COPY --from=builder /app/target/release/dbbench ${BIN_DIR}/dbbench
+
+COPY --from=builder /usr/local/cargo/bin/tokio-console  ${BIN_DIR}/tokio-console
 
 WORKDIR ${BIN_DIR}
 
