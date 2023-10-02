@@ -31,6 +31,8 @@ ENV DATABASE_URL=${DATABASE_URL}
 
 RUN cargo build --release --features "${DB_MODE},${SERVER_MODE}"
 
+RUN cargo install --locked tokio-console
+
 FROM debian:bookworm-slim
 
 RUN apt-get update \
@@ -40,6 +42,8 @@ ARG BIN_DIR=/local/bin
 ARG BINARY=dbbench
 
 EXPOSE 8080
+
+EXPOSE 5555
 
 RUN mkdir -p ${BIN_DIR}
 

@@ -5,6 +5,7 @@ use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
 use futures::join;
 
+// use console_subscriber;
 use std::env;
 
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
@@ -30,6 +31,19 @@ async fn init(database_url: &str) -> pooling::SqlxAsync {
 #[cfg(feature = "axum")]
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    use tracing_subscriber::prelude::*;
+
+    let console_layer = console_subscriber::ConsoleLayer::builder()
+        .with_default_env()
+        .server_addr(([127, 0, 0, 1], 5555))
+        .spawn();
+
+    tracing_subscriber::registry()
+        .with(console_layer)
+        .with(tracing_subscriber::fmt::layer())
+        //  .with(...)
+        .init();
+
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     #[cfg(any(feature = "diesel", feature = "sqlx"))]
     let store = init(&database_url).await;
@@ -48,10 +62,23 @@ async fn main() -> std::io::Result<()> {
 }
 
 #[cfg(feature = "actix")]
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> std::io::Result<()> {
     // std::env::set_var("RUST_LOG", "debug");
     // env_logger::init();
+    use tracing_subscriber::prelude::*;
+
+    let console_layer = console_subscriber::ConsoleLayer::builder()
+        .with_default_env()
+        .server_addr(([127, 0, 0, 1], 5555))
+        .spawn();
+
+    tracing_subscriber::registry()
+        .with(console_layer)
+        .with(tracing_subscriber::fmt::layer())
+        //  .with(...)
+        .init();
+
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     println!("{database_url}");
@@ -65,6 +92,7 @@ async fn main() -> std::io::Result<()> {
                 .route("/", web::get().to(executor))
                 .route("/sequential", web::get().to(executor_sequential))
         })
+        .workers(1)
         .bind(("0.0.0.0", 8080))?
         .run()
         .await
@@ -157,6 +185,7 @@ async fn executor(
 }
 
 #[cfg(feature = "actix")]
+#[cfg(any(feature = "diesel", feature = "sqlx"))]
 async fn executor_sequential(
     #[cfg(feature = "sqlx")] store: web::Data<pooling::SqlxAsync>,
     #[cfg(feature = "diesel")] store: web::Data<pooling::DieselAsync>,
@@ -198,6 +227,7 @@ async fn executor_sequential(
 }
 
 #[cfg(feature = "axum")]
+#[cfg(any(feature = "diesel", feature = "sqlx"))]
 async fn executor(
     #[cfg(feature = "sqlx")] axum::extract::State(store): axum::extract::State<pooling::SqlxAsync>,
     #[cfg(feature = "diesel")] axum::extract::State(store): axum::extract::State<
@@ -285,6 +315,7 @@ async fn executor(
 }
 
 #[cfg(feature = "axum")]
+#[cfg(any(feature = "diesel", feature = "sqlx"))]
 async fn executor_sequential(
     #[cfg(feature = "sqlx")] axum::extract::State(store): axum::extract::State<pooling::SqlxAsync>,
     #[cfg(feature = "diesel")] axum::extract::State(store): axum::extract::State<
