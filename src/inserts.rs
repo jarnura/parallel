@@ -18,6 +18,7 @@ pub struct Inserts;
 
 #[cfg(any(feature = "diesel", feature = "sqlx"))]
 impl Inserts {
+    #[tracing::instrument(skip_all)]
     fn make_pi() -> models::PaymentIntentNew {
         let created_at @ modified_at = Some(utils::current_time());
         models::PaymentIntentNew {
@@ -30,19 +31,25 @@ impl Inserts {
 
 #[cfg(feature = "diesel")]
 impl Inserts {
+    #[tracing::instrument(skip_all)]
     pub async fn insert_pi(store: &pooling::DieselAsync) -> models::PaymentIntent {
         use crate::schema::payment_intent::dsl::*;
         let conn = pooling::get_connection(store).await;
         let pi = Self::make_pi();
-        println!("{pi:#?}");
+        // println!("{pi:#?}");
 
-        diesel::insert_into(payment_intent)
+        let pi = diesel::insert_into(payment_intent)
             .values(pi)
             .get_result_async(&*conn)
             .await
-            .expect("Unable to insert")
+            .expect("Unable to insert");
+
+        drop(conn);
+
+        pi
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn insert_pi_with_instrument(
         store: &pooling::DieselAsync,
         ix: i8,
@@ -54,6 +61,7 @@ impl Inserts {
 #[cfg(feature = "sqlx")]
 // impl Inserts<pooling::SqlxAsync> {
 impl Inserts {
+    #[tracing::instrument]
     pub async fn insert_pi(store: &pooling::SqlxAsync) -> models::PaymentIntent {
         // use crate::schema::payment_intent::dsl::*;
         let conn = pooling::get_connection(store).await;
@@ -78,6 +86,7 @@ impl Inserts {
         .expect("Unable to insert")
     }
 
+    #[tracing::instrument]
     pub async fn insert_pi_with_instrument(
         store: &pooling::SqlxAsync,
         ix: i8,

@@ -13,16 +13,20 @@ pub struct Reads;
 
 #[cfg(feature = "diesel")]
 impl Reads {
+    #[tracing::instrument(skip_all)]
     pub async fn read_pi(store: &pooling::DieselAsync, pid: String) -> models::PaymentIntent {
         use crate::schema::payment_intent::dsl::*;
         let conn = pooling::get_connection(store).await;
-        payment_intent
+        let pi = payment_intent
             .filter(payment_id.eq(pid))
             .first_async::<models::PaymentIntent>(&*conn)
             .await
-            .expect("Error loading payment_intent")
+            .expect("Error loading payment_intent");
+        drop(conn);
+        pi
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn read_pi_with_instrument(
         store: &pooling::DieselAsync,
         pid: String,

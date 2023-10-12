@@ -10,13 +10,18 @@
 
 // impl Store for SqlxAsync {}
 
-pub async fn get_connection<T: DatabasePooling>(pool: &T) -> T::PooledConnection<'_> {
+// #[tracing::instrument]
+pub async fn get_connection<T: DatabasePooling + core::fmt::Debug>(
+    pool: &T,
+) -> T::PooledConnection<'_> {
     T::get_connection(pool).await
 }
 
 // pub async fn get_connection_from_store<T: DatabasePooling>(store: &Store<T>) -> T::PooledConnection<'_> {
 //     store.master_pool
 // }
+use dotenvy::dotenv;
+
 
 #[async_trait::async_trait]
 pub trait DatabasePooling {
@@ -31,18 +36,21 @@ pub trait DatabasePooling {
 }
 
 #[cfg(feature = "diesel")]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DieselAsync {
     pool: bb8::Pool<async_bb8_diesel::ConnectionManager<diesel::PgConnection>>,
 }
 
 #[cfg(feature = "diesel")]
 impl DieselAsync {
+    #[tracing::instrument]
     pub async fn new(database_url: &str) -> Self
     where
         Self: DatabasePooling,
     {
-        let pool = Self::build_pool(database_url, 10).await;
+        dotenv().ok();
+        let pool_size: u32 = std::env::var("DB_POOL_SIZE").unwrap_or("10".to_string()).parse().unwrap_or(10);
+        let pool = Self::build_pool(database_url, pool_size).await;
         Self { pool }
     }
 }
@@ -59,7 +67,7 @@ impl DatabasePooling for DieselAsync {
     #[allow(clippy::expect_used)]
     async fn build_pool(database_url: &str, max_size: u32) -> Self::ConnectionPool {
         let manager = Self::ConnectionManager::new(database_url);
-        let pool = Self::ConnectionPool::builder().max_size(max_size);
+        let pool = Self::ConnectionPool::builder().max_size(max_size).queue_strategy(bb8::QueueStrategy::Lifo);
         pool.build(manager)
             .await
             .expect("Failed to create PostgreSQL connection pool")
@@ -75,7 +83,7 @@ impl DatabasePooling for DieselAsync {
 }
 
 #[cfg(feature = "sqlx")]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SqlxAsync {
     pool: sqlx::Pool<sqlx::Postgres>,
 }
@@ -85,7 +93,9 @@ impl SqlxAsync {
     where
         Self: DatabasePooling,
     {
-        let pool = Self::build_pool(database_url, 10).await;
+        dotenv().ok();
+        let pool_size: u32 = std::env::var("DB_POOL_SIZE").unwrap_or("10".to_string()).parse().unwrap_or(10);
+        let pool = Self::build_pool(database_url, pool_size).await;
         Self { pool }
     }
 }
