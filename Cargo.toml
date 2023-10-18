@@ -11,10 +11,14 @@ diesel = []
 sqlx = []
 actix = []
 axum = []
+async_diesel = []
+dummy = []
+
 
 [dependencies]
-diesel = { version = "2.1.0",features = ["postgres", "serde_json", "time", "64-column-tables"]}
-async-bb8-diesel = { git = "https://github.com/oxidecomputer/async-bb8-diesel", rev = "be3d9bce50051d8c0e0c06078e8066cc27db3001" }
+diesel = { version = "2.1.0",features = ["r2d2", "postgres", "serde_json", "time", "64-column-tables"]}
+diesel-async = { version = "0.4.1", features = ["postgres", "bb8"] }
+# async-bb8-diesel = { git = "https://github.com/oxidecomputer/async-bb8-diesel", rev = "be3d9bce50051d8c0e0c06078e8066cc27db3001" }
 async-trait = "0.1.63"
 bb8 = "0.8"
 dotenvy = "0.15"
@@ -29,7 +33,7 @@ time = { version = "0.3.23", features = ["serde", "serde-well-known", "std"] }
 actix-rt = "2.8.0"
 futures = "0.3.28"
 env_logger = "0.10.0"
-tokio = { version = "1.17", features = ["full", "tracing"] }
+tokio = { version = "1.32", features = ["full", "tracing", "rt-multi-thread"] }
 axum = "0.6.20"
 console-subscriber = "0.2.0"
 tracing-subscriber = "0.3.17"
@@ -40,6 +44,14 @@ tracing = "0.1.37"
 opentelemetry_sdk = { version = "0.20.0", features = ["rt-tokio"] }
 actix-web-opentelemetry = { version = "0.15.0", features = ["metrics"] }
 pprof = { version = "0.13.0", features = ["flamegraph", "protobuf-codec"] }
+
+thiserror = "1.0"
+num_cpus = "1.16.0"
+
+[dev-dependencies]
+diesel = { version = "2.1.0", features = [ "postgres", "r2d2" ] }
+tokio = { version = "1.32", features = [ "macros"] }
+
 [[bin]]
 name = "dbbench"
 path = "src/main.rs"

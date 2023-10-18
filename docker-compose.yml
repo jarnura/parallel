@@ -53,14 +53,15 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
+          cpus: '2'
     environment:
       - CARGO_TARGET_DIR=/cargo_build_cache
       - DATABASE_URL=postgres://postgres:postgres@pg/diesel_demo
       - JAEGER_ENDPOINT=jaeger:6831
       - DB_POOL_SIZE=124
-      - WORKER=1
+      - WORKER=4
       - SHUTDOWN_TIMEOUT=2000
+      - BLOCK_THREADS_COUNT=512 
     healthcheck:
       test: curl --fail http://localhost:8080/parallel/ || exit 1
       interval: 15s

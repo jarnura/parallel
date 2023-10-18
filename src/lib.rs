@@ -1,3 +1,7 @@
+pub mod async_trait;
+pub mod connection;
+pub mod connection_manager;
+pub mod error;
 pub mod inserts;
 pub mod models;
 pub mod pooling;

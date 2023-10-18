@@ -2,19 +2,29 @@ use opentelemetry::global;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[cfg(feature = "actix")]
-#[cfg(any(feature = "diesel", feature = "sqlx"))]
+#[cfg(any(
+    feature = "diesel",
+    feature = "async_diesel",
+    feature = "sqlx",
+    feature = "dummy"
+))]
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 
-#[cfg(any(feature = "diesel", feature = "sqlx"))]
+#[cfg(any(
+    feature = "diesel",
+    feature = "async_diesel",
+    feature = "sqlx",
+    feature = "dummy"
+))]
 use futures::join;
 
 // use console_subscriber;
 use std::env;
 
-#[cfg(any(feature = "diesel", feature = "sqlx"))]
+// #[cfg(any(feature = "diesel", feature = "sqlx"))]
 use dotenvy::dotenv;
 
-#[cfg(any(feature = "diesel", feature = "sqlx"))]
+#[cfg(any(feature = "diesel", feature = "async_diesel", feature = "sqlx"))]
 use parallel::{inserts::Inserts, pooling, reads::Reads};
 
 use tracing;
@@ -25,6 +35,14 @@ async fn init(database_url: &str) -> pooling::DieselAsync {
     dotenv().ok();
 
     pooling::DieselAsync::new(database_url).await
+}
+
+#[cfg(feature = "async_diesel")]
+#[tracing::instrument]
+async fn init(database_url: &str) -> pooling::DieselPureAsync {
+    // dotenv().ok();
+
+    pooling::DieselPureAsync::new(database_url).await
 }
 
 #[cfg(feature = "sqlx")]
@@ -39,27 +57,37 @@ async fn init(database_url: &str) -> pooling::SqlxAsync {
 async fn main() -> std::io::Result<()> {
     use tracing_subscriber::prelude::*;
 
-    let console_layer = console_subscriber::ConsoleLayer::builder()
-        .with_default_env()
-        .server_addr(([127, 0, 0, 1], 5555))
-        .spawn();
+    // let console_layer = console_subscriber::ConsoleLayer::builder()
+    //     .with_default_env()
+    //     .server_addr(([127, 0, 0, 1], 5555))
+    //     .spawn();
 
-    tracing_subscriber::registry()
-        .with(console_layer)
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    // tracing_subscriber::registry()
+    //     .with(console_layer)
+    //     .with(tracing_subscriber::fmt::layer())
+    //     .init();
+
+    // let telemetry = OpenTelemetryStack::new();
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     #[cfg(any(feature = "diesel", feature = "sqlx"))]
     let store = init(&database_url).await;
+
+    #[cfg(any(feature = "diesel", feature = "sqlx"))]
     let app = axum::Router::new()
         .route("/", axum::routing::get(executor))
         .route("/sequential", axum::routing::get(executor_sequential))
         .with_state(store);
 
+    #[cfg(feature = "dummy")]
+    let app = axum::Router::new().route("/parallel", axum::routing::get(executor));
+    // .route("/sequential", axum::routing::get(executor_sequential))
+    // .with_state(store);
     // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
         .serve(app.into_make_service())
+        // .layer(RequestTracing::new())
+        // .layer(telemetry.metrics())
         .await
         .unwrap();
 
@@ -67,7 +95,7 @@ async fn main() -> std::io::Result<()> {
 }
 
 use actix_web_opentelemetry::{RequestMetrics, RequestTracing};
-    use tracing_subscriber::prelude::*;
+use tracing_subscriber::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct OpenTelemetryStack {
@@ -83,26 +111,28 @@ impl OpenTelemetryStack {
         let tracer = opentelemetry_jaeger::new_agent_pipeline()
             .with_endpoint(std::env::var("JAEGER_ENDPOINT").unwrap_or("localhost:6831".to_string()))
             .with_service_name(app_name.clone())
-                
-.with_auto_split_batch(true)            .install_batch(opentelemetry::runtime::Tokio)
+            .with_auto_split_batch(true)
+            .install_batch(opentelemetry::runtime::Tokio)
             .expect("Failed to install OpenTelemetry tracer.");
+
+        // let console_layer = console_subscriber::ConsoleLayer::builder()
+        // .with_default_env()
+        // .spawn();
 
         let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
         let subscriber = tracing_subscriber::Registry::default().with(telemetry);
+        // .with(console_layer);
         tracing::subscriber::set_global_default(subscriber)
             .expect("Failed to install `tracing` subscriber.");
 
         let request_metrics = RequestMetrics::default();
-        Self {
-            request_metrics,
-        }
+        Self { request_metrics }
     }
 
     pub fn metrics(&self) -> actix_web_opentelemetry::RequestMetrics {
         self.request_metrics.clone()
     }
 }
-
 
 use tokio::sync::mpsc;
 
@@ -139,22 +169,22 @@ impl Stop for mpsc::Sender<()> {
 #[cfg(feature = "actix")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+    use pprof::protos::Message;
     use std::fs::File;
     use std::io::Write;
-    use pprof::protos::Message;
-    
+
     // std::env::set_var("RUST_LOG", "debug");
     // env_logger::init();
-    
+
     // tracing_subscriber::fmt::try_init()?;
 
     // global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
 
     // let tracer = opentelemetry_jaeger::new_agent_pipeline()
-        // .with_endpoint(std::env::var("JAEGER_ENDPOINT").unwrap_or("localhost:6831".to_string()))
-        // .with_auto_split_batch(true)
-        // .with_service_name("parallel-jaeger")
-        // .install_batch(opentelemetry::runtime::Tokio)?;
+    // .with_endpoint(std::env::var("JAEGER_ENDPOINT").unwrap_or("localhost:6831".to_string()))
+    // .with_auto_split_batch(true)
+    // .with_service_name("parallel-jaeger")
+    // .install_batch(opentelemetry::runtime::Tokio)?;
 
     // let opentelemetry = tracing_opentelemetry::layer().with_tracer(tracer);
 
@@ -170,16 +200,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     //     // .with(console_layer)
     //     .with(opentelemetry)
     //     .try_init()?;
-    let _prof_guard = pprof::ProfilerGuardBuilder::default().frequency(1000).blocklist(&["libc", "libgcc", "pthread", "vdso"]).build().unwrap();
+    let _prof_guard = pprof::ProfilerGuardBuilder::default()
+        .frequency(1000)
+        .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+        .build()
+        .unwrap();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let worker = env::var("WORKER").unwrap_or("1".to_string()).parse().unwrap_or(1);
-    let shutdown_timeout = env::var("SHUTDOWN_TIMEOUT").unwrap_or("10".to_string()).parse().unwrap_or(10);
+    // let worker = env::var("WORKER")
+    // .unwrap_or("1".to_string())
+    // .parse()
+    // .unwrap_or(1);
+    let worker = num_cpus::get_physical();
+    let shutdown_timeout = env::var("SHUTDOWN_TIMEOUT")
+        .unwrap_or("10".to_string())
+        .parse()
+        .unwrap_or(10);
     let file_path = env::var("FILE_PATH").unwrap_or("/mnt/reports".to_string());
+    let block_threads_count = env::var("BLOCK_THREADS_COUNT")
+        .unwrap_or("32".to_string())
+        .parse()
+        .unwrap_or(32);
     println!("{database_url}");
-        let telemetry = OpenTelemetryStack::new();
+    println!("{worker}");
+    let telemetry = OpenTelemetryStack::new();
     let (tx, rx) = tokio::sync::oneshot::channel();
 
-    #[cfg(any(feature = "diesel", feature = "sqlx"))]
+    #[cfg(any(feature = "diesel", feature = "sqlx", feature = "async_diesel"))]
     let _ = {
         let store = init(&database_url).await;
         let server = HttpServer::new(move || {
@@ -193,20 +239,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
                 .wrap(telemetry.metrics())
         })
         .workers(worker)
+        .worker_max_blocking_threads(block_threads_count)
         .shutdown_timeout(shutdown_timeout)
         .bind(("0.0.0.0", 8080))?
         .run();
-        
+
         tokio::spawn(receiver_for_error(rx, server.handle()));
 
         server.await.expect("Failed to create the server");
     };
 
+    #[cfg(feature = "dummy")]
+    let _ = {
+        // let store = init(&database_url).await;
+        let server = HttpServer::new(move || {
+            App::new()
+                // .app_data(web::Data::new(store.clone()))
+                .route("/parallel", web::get().to(executor))
+                // .route("/parallel", web::get().to(sequential))
+                .wrap(actix_web::middleware::Logger::default())
+                .wrap(RequestTracing::new())
+                .wrap(telemetry.metrics())
+        })
+        .workers(worker)
+        .worker_max_blocking_threads(block_threads_count)
+        .shutdown_timeout(shutdown_timeout)
+        .bind(("0.0.0.0", 8080))?
+        .run();
 
+        tokio::spawn(receiver_for_error(rx, server.handle()));
+
+        server.await.expect("Failed to create the server");
+    };
     println!("Report generation started");
 
     let now = parallel::utils::current_time().to_string();
-    
+
     if let Ok(report) = _prof_guard.report().build() {
         let file = File::create(format!("{file_path}/flamegraph_{now}.svg")).unwrap();
         let mut options = pprof::flamegraph::Options::default();
@@ -231,90 +299,194 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
 use actix_web::get;
 
 #[cfg(feature = "actix")]
-#[cfg(any(feature = "diesel", feature = "sqlx"))]
+#[cfg(any(feature = "diesel", feature = "async_diesel", feature = "sqlx"))]
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(web::scope("/parallel").service(executor));
 }
 
+#[cfg(feature = "dummy")]
 #[cfg(feature = "actix")]
-#[cfg(any(feature = "diesel", feature = "sqlx"))]
+#[tracing::instrument]
+// #[get("/")]
+async fn executor() -> impl Responder {
+    println!("main entering");
+
+    let start_time = parallel::utils::current_time();
+    let d1_async = delay(1);
+    let d2_async = delay(2);
+    let d3_async = delay(3);
+    let d4_async = delay(4);
+    let d5_async = delay(5);
+
+    // actix_web::rt::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    let (d1, d2, d3, d4, d5) = tokio::join!(delay(1), delay(2), delay(3), delay(4), delay(5));
+
+    let d1_async = delay(1);
+    let d2_async = delay(2);
+    let d3_async = delay(3);
+    let d4_async = delay(4);
+    let d5_async = delay(5);
+
+    let (d1, d2, d3, d4, d5) = tokio::join!(d1_async, d2_async, d3_async, d4_async, d5_async);
+    let end_time = parallel::utils::current_time();
+    let diff = end_time - start_time;
+
+    HttpResponse::Ok().body(format!("{diff}"))
+}
+
+#[cfg(feature = "dummy")]
+#[cfg(feature = "actix")]
+#[tracing::instrument]
+// #[get("/")]
+async fn sequential() -> impl Responder {
+    println!("main entering");
+
+    let start_time = parallel::utils::current_time();
+    let d1_async = delay(1).await;
+    let d2_async = delay(2).await;
+    let d3_async = delay(3).await;
+    let d4_async = delay(4).await;
+    let d5_async = delay(5).await;
+
+    // actix_web::rt::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // let (d1, d2, d3, d4, d5) = join!(d1_async, d2_async, d3_async, d4_async, d5_async);
+
+    let d1_async = delay(1).await;
+    let d2_async = delay(2).await;
+    let d3_async = delay(3).await;
+    let d4_async = delay(4).await;
+    let d5_async = delay(5).await;
+
+    // let (d1, d2, d3, d4, d5) = join!(d1_async, d2_async, d3_async, d4_async, d5_async);
+    let end_time = parallel::utils::current_time();
+    let diff = end_time - start_time;
+
+    HttpResponse::Ok().body(format!("{diff}"))
+}
+
+#[cfg(feature = "dummy")]
+#[cfg(feature = "axum")]
+#[tracing::instrument]
+// #[get("/")]
+async fn executor() -> impl axum::response::IntoResponse {
+    println!("main entering");
+    use axum::response::IntoResponse;
+
+    let start_time = parallel::utils::current_time();
+    let d1_async = delay(1);
+    let d2_async = delay(2);
+    let d3_async = delay(3);
+    let d4_async = delay(4);
+    let d5_async = delay(5);
+
+    // actix_web::rt::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    let (d1, d2, d3, d4, d5) = join!(d1_async, d2_async, d3_async, d4_async, d5_async);
+
+    let d1_async = delay(1);
+    let d2_async = delay(2);
+    let d3_async = delay(3);
+    let d4_async = delay(4);
+    let d5_async = delay(5);
+
+    let (d1, d2, d3, d4, d5) = join!(d1_async, d2_async, d3_async, d4_async, d5_async);
+    let end_time = parallel::utils::current_time();
+    let diff = end_time - start_time;
+
+    diff.to_string().into_response()
+}
+
+#[cfg(feature = "dummy")]
+#[tracing::instrument]
+async fn delay(ix: u8) {
+    println!("entering delay {ix}");
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
+
+    println!("exit delay {ix}");
+}
+
+#[cfg(feature = "actix")]
+#[cfg(any(feature = "diesel", feature = "async_diesel", feature = "sqlx"))]
 #[tracing::instrument(skip_all)]
 #[get("/")]
 async fn executor(
     #[cfg(feature = "sqlx")] store: web::Data<pooling::SqlxAsync>,
     #[cfg(feature = "diesel")] store: web::Data<pooling::DieselAsync>,
+    #[cfg(feature = "async_diesel")] store: web::Data<pooling::DieselPureAsync>,
 ) -> impl Responder {
     println!("main entering");
 
     let start_time = parallel::utils::current_time();
     let store = store.get_ref();
 
-    let pi_1_async = Inserts::insert_pi_with_instrument(store, 1);
-    let pi_2_async = Inserts::insert_pi_with_instrument(store, 2);
-    let pi_3_async = Inserts::insert_pi_with_instrument(store, 3);
-    let pi_4_async = Inserts::insert_pi_with_instrument(store, 4);
-    let pi_5_async = Inserts::insert_pi_with_instrument(store, 5);
-    // let pi_6_async = Inserts::insert_pi_with_instrument(store, 6);
-    // let pi_7_async = Inserts::insert_pi_with_instrument(store, 7);
-    // let pi_8_async = Inserts::insert_pi_with_instrument(store, 8);
-    // let pi_9_async = Inserts::insert_pi_with_instrument(store, 9);
-    // let pi_10_async = Inserts::insert_pi_with_instrument(store, 10);
+    // let pi_1_async = tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 1));
+    // let pi_2_async = tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 2));
+    // let pi_3_async = tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 3));
+    // let pi_4_async = tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 4));
+    // let pi_5_async = tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 5));
+    let pi_6_async = Inserts::insert_pi_with_instrument(store, 6);
+    let pi_7_async = Inserts::insert_pi_with_instrument(store, 7);
+    let pi_8_async = Inserts::insert_pi_with_instrument(store, 8);
+    let pi_9_async = Inserts::insert_pi_with_instrument(store, 9);
+    let pi_10_async = Inserts::insert_pi_with_instrument(store, 10);
     // let pi_11_async = Inserts::insert_pi_with_instrument(store, 11);
     // let pi_12_async = Inserts::insert_pi_with_instrument(store, 12);
     actix_web::rt::time::sleep(tokio::time::Duration::from_millis(100)).await;
     let (
-        pi_1_async,
-        pi_2_async,
-        pi_3_async,
-        pi_4_async,
-        pi_5_async,
-        // pi_6_async,
-        // pi_7_async,
-        // pi_8_async,
-        // pi_9_async,
-        // pi_10_async,
+        // pi_1_async,
+        // pi_2_async,
+        // pi_3_async,
+        // pi_4_async,
+        // pi_5_async,
+        pi_6_async,
+        pi_7_async,
+        pi_8_async,
+        pi_9_async,
+        pi_10_async,
         // pi_11_async,
         // pi_12_async,
-    ) = join!(
-        pi_1_async,
-        pi_2_async,
-        pi_3_async,
-        pi_4_async,
-        pi_5_async,
-        // pi_6_async,
-        // pi_7_async,
-        // pi_8_async,
-        // pi_9_async,
-        // pi_10_async,
+    ) = tokio::join!(
+        // pi_1_async, pi_2_async, pi_3_async, pi_4_async,
+        // pi_5_async,
+        // Inserts::insert_pi_with_instrument(store, 1),
+        // Inserts::insert_pi_with_instrument(store, 2),
+        // Inserts::insert_pi_with_instrument(store, 3),
+        // Inserts::insert_pi_with_instrument(store, 4),
+        // Inserts::insert_pi_with_instrument(store, 5),
+        pi_6_async,
+        pi_7_async,
+        pi_8_async,
+        pi_9_async,
+        pi_10_async,
         // pi_11_async,
         // pi_12_async
     );
 
     // actix_web::rt::time::sleep(tokio::time::Duration::from_millis(100)).await;
-    let pi_1_async = Reads::read_pi_with_instrument(store, pi_1_async.payment_id, 1);
-    let pi_2_async = Reads::read_pi_with_instrument(store, pi_2_async.payment_id, 2);
-    let pi_3_async = Reads::read_pi_with_instrument(store, pi_3_async.payment_id, 3);
-    let pi_4_async = Reads::read_pi_with_instrument(store, pi_4_async.payment_id, 4);
-    let pi_5_async = Reads::read_pi_with_instrument(store, pi_5_async.payment_id, 5);
-    // let pi_6_async = Reads::read_pi_with_instrument(store, pi_6_async.payment_id, 6);
-    // let pi_7_async = Reads::read_pi_with_instrument(store, pi_7_async.payment_id, 7);
-    // let pi_8_async = Reads::read_pi_with_instrument(store, pi_8_async.payment_id, 8);
-    // let pi_9_async = Reads::read_pi_with_instrument(store, pi_9_async.payment_id, 9);
-    // let pi_10_async = Reads::read_pi_with_instrument(store, pi_10_async.payment_id, 10);
+    // let pi_1_async = tokio::spawn(Reads::_read_pi_with_instrument(store.clone(), pi_1_async.unwrap().payment_id, 1));
+    // let pi_2_async = tokio::spawn(Reads::_read_pi_with_instrument(store.clone(), pi_2_async.unwrap().payment_id, 2));
+    // let pi_3_async = tokio::spawn(Reads::_read_pi_with_instrument(store.clone(), pi_3_async.unwrap().payment_id, 3));
+    // let pi_4_async = tokio::spawn(Reads::_read_pi_with_instrument(store.clone(), pi_4_async.unwrap().payment_id, 4));
+    // let pi_5_async = tokio::spawn(Reads::_read_pi_with_instrument(store.clone(), pi_5_async.unwrap().payment_id, 5));
+    let pi_6_async = Reads::read_pi_with_instrument(store, pi_6_async.payment_id, 6);
+    let pi_7_async = Reads::read_pi_with_instrument(store, pi_7_async.payment_id, 7);
+    let pi_8_async = Reads::read_pi_with_instrument(store, pi_8_async.payment_id, 8);
+    let pi_9_async = Reads::read_pi_with_instrument(store, pi_9_async.payment_id, 9);
+    let pi_10_async = Reads::read_pi_with_instrument(store, pi_10_async.payment_id, 10);
     // let pi_11_async = Reads::read_pi_with_instrument(store, pi_11_async.payment_id, 11);
     // let pi_12_async = Reads::read_pi_with_instrument(store, pi_12_async.payment_id, 12);
     // actix_web::rt::time::sleep(tokio::time::Duration::from_millis(100)).await;
-    let _ = join!(
-        pi_1_async,
-        pi_2_async,
-        pi_3_async,
-        pi_4_async,
-        pi_5_async,
-        // pi_6_async,
-        // pi_7_async,
-        // pi_8_async,
-        // pi_9_async,
-        // pi_10_async,
+    let _ = tokio::join!(
+        // pi_1_async, pi_2_async, pi_3_async, pi_4_async,
+        // pi_5_async,
+        pi_6_async,
+        pi_7_async,
+        pi_8_async,
+        pi_9_async,
+        pi_10_async,
         // pi_11_async,
         // pi_12_async
     );

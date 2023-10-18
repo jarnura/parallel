@@ -10,7 +10,7 @@
 
 // impl Store for SqlxAsync {}
 
-// #[tracing::instrument]
+#[tracing::instrument]
 pub async fn get_connection<T: DatabasePooling + core::fmt::Debug>(
     pool: &T,
 ) -> T::PooledConnection<'_> {
@@ -21,7 +21,6 @@ pub async fn get_connection<T: DatabasePooling + core::fmt::Debug>(
 //     store.master_pool
 // }
 use dotenvy::dotenv;
-
 
 #[async_trait::async_trait]
 pub trait DatabasePooling {
@@ -38,7 +37,7 @@ pub trait DatabasePooling {
 #[cfg(feature = "diesel")]
 #[derive(Clone, Debug)]
 pub struct DieselAsync {
-    pool: bb8::Pool<async_bb8_diesel::ConnectionManager<diesel::PgConnection>>,
+    pool: bb8::Pool<crate::connection_manager::ConnectionManager<diesel::PgConnection>>,
 }
 
 #[cfg(feature = "diesel")]
@@ -49,16 +48,93 @@ impl DieselAsync {
         Self: DatabasePooling,
     {
         dotenv().ok();
-        let pool_size: u32 = std::env::var("DB_POOL_SIZE").unwrap_or("10".to_string()).parse().unwrap_or(10);
+        let pool_size: u32 = std::env::var("DB_POOL_SIZE")
+            .unwrap_or("10".to_string())
+            .parse()
+            .unwrap_or(10);
         let pool = Self::build_pool(database_url, pool_size).await;
         Self { pool }
     }
 }
 
+// #[cfg(feature = "async_diesel")]
+use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::pooled_connection::ManagerConfig;
+use diesel_async::pooled_connection::{self, bb8::Pool};
+use diesel_async::AsyncPgConnection;
+
+#[cfg(feature = "async_diesel")]
+#[derive(Clone, Debug)]
+pub struct DieselPureAsync {
+    pool: bb8::Pool<AsyncDieselConnectionManager<AsyncPgConnection>>,
+}
+
+#[cfg(feature = "async_diesel")]
+impl DieselPureAsync {
+    #[tracing::instrument]
+    pub async fn new(database_url: &str) -> Self
+    where
+        Self: DatabasePooling,
+    {
+        dotenv().ok();
+        let pool_size: u32 = std::env::var("DB_POOL_SIZE")
+            .unwrap_or("10".to_string())
+            .parse()
+            .unwrap_or(10);
+        let pool = Self::build_pool(database_url, pool_size).await;
+        Self { pool }
+    }
+}
+
+#[cfg(feature = "async_diesel")]
+#[async_trait::async_trait]
+impl DatabasePooling for DieselPureAsync {
+    type ConnectionManager = AsyncDieselConnectionManager<AsyncPgConnection>;
+    type ConnectionPool = pooled_connection::bb8::Pool<AsyncPgConnection>;
+    type PooledConnection<'a> = pooled_connection::bb8::PooledConnection<'a, AsyncPgConnection>;
+
+    #[allow(clippy::expect_used)]
+    async fn build_pool(database_url: &str, max_size: u32) -> Self::ConnectionPool {
+        let mut config = pooled_connection::ManagerConfig::default();
+        config.recycling_method = pooled_connection::RecyclingMethod::Fast;
+        let manager = Self::ConnectionManager::new_with_config(database_url, config);
+        Self::ConnectionPool::builder()
+            .max_size(max_size)
+            .min_idle(Some(5))
+            .max_lifetime(Some(std::time::Duration::from_secs(60 * 60 * 24)))
+            .idle_timeout(Some(std::time::Duration::from_secs(60 * 2)))
+            .build(manager)
+            .await
+            .expect("Failed to create PostgresSQL connection pool")
+    }
+
+    #[allow(clippy::expect_used)]
+    #[tracing::instrument]
+    async fn get_connection(&self) -> Self::PooledConnection<'_> {
+        self.pool
+            .get()
+            .await
+            .expect("Couldn't retrieve PostgreSQL connection")
+    }
+}
+
+// impl DieselPureAsync {
+//     #[tracing::instrument]
+//     pub async fn new(database_url: &str) -> Self
+//     where
+//         Self: DatabasePooling,
+//     {
+//         let pool_size: u32 = std::env::var("DB_POOL_SIZE").unwrap_or("10".to_string()).parse().unwrap_or(10);
+//         let pool = Self::build_pool(database_url, pool_size).await;
+//         Self { pool }
+
+//     }
+// }
+
 #[cfg(feature = "diesel")]
 #[async_trait::async_trait]
 impl DatabasePooling for DieselAsync {
-    type ConnectionManager = async_bb8_diesel::ConnectionManager<diesel::PgConnection>;
+    type ConnectionManager = crate::connection_manager::ConnectionManager<diesel::PgConnection>;
 
     type ConnectionPool = bb8::Pool<Self::ConnectionManager>;
 
@@ -67,13 +143,16 @@ impl DatabasePooling for DieselAsync {
     #[allow(clippy::expect_used)]
     async fn build_pool(database_url: &str, max_size: u32) -> Self::ConnectionPool {
         let manager = Self::ConnectionManager::new(database_url);
-        let pool = Self::ConnectionPool::builder().max_size(max_size).queue_strategy(bb8::QueueStrategy::Lifo);
+        let pool = Self::ConnectionPool::builder()
+            .max_size(max_size)
+            .queue_strategy(bb8::QueueStrategy::Lifo);
         pool.build(manager)
             .await
             .expect("Failed to create PostgreSQL connection pool")
     }
 
     #[allow(clippy::expect_used)]
+    #[tracing::instrument]
     async fn get_connection(&self) -> Self::PooledConnection<'_> {
         self.pool
             .get()
@@ -94,7 +173,10 @@ impl SqlxAsync {
         Self: DatabasePooling,
     {
         dotenv().ok();
-        let pool_size: u32 = std::env::var("DB_POOL_SIZE").unwrap_or("10".to_string()).parse().unwrap_or(10);
+        let pool_size: u32 = std::env::var("DB_POOL_SIZE")
+            .unwrap_or("10".to_string())
+            .parse()
+            .unwrap_or(10);
         let pool = Self::build_pool(database_url, pool_size).await;
         Self { pool }
     }
