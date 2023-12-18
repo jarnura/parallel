@@ -18,9 +18,10 @@ dummy = []
 [dependencies]
 diesel = { version = "2.1.0",features = ["r2d2", "postgres", "serde_json", "time", "64-column-tables"]}
 diesel-async = { version = "0.4.1", features = ["postgres", "bb8"] }
-# async-bb8-diesel = { git = "https://github.com/oxidecomputer/async-bb8-diesel", rev = "be3d9bce50051d8c0e0c06078e8066cc27db3001" }
-async-trait = "0.1.63"
+async-bb8-diesel = { git = "https://github.com/jarnura/async-bb8-diesel", rev = "69d59315bef9778903abdc6d923044ca2757fd02" }
+async-trait = "0.1.73"
 bb8 = "0.8"
+# bb8 = {git = "https://github.com/jarnura/bb8", rev = "78d91e546785815ede9585a36767891db286998d"}
 dotenvy = "0.15"
 actix-web = "4.3.0"
 tokio-diesel = "0.3.0"

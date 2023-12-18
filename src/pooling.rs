@@ -37,7 +37,7 @@ pub trait DatabasePooling {
 #[cfg(feature = "diesel")]
 #[derive(Clone, Debug)]
 pub struct DieselAsync {
-    pool: bb8::Pool<crate::connection_manager::ConnectionManager<diesel::PgConnection>>,
+    pool: bb8::Pool<async_bb8_diesel::ConnectionManager<diesel::PgConnection>>,
 }
 
 #[cfg(feature = "diesel")]
@@ -134,7 +134,7 @@ impl DatabasePooling for DieselPureAsync {
 #[cfg(feature = "diesel")]
 #[async_trait::async_trait]
 impl DatabasePooling for DieselAsync {
-    type ConnectionManager = crate::connection_manager::ConnectionManager<diesel::PgConnection>;
+    type ConnectionManager = async_bb8_diesel::ConnectionManager<diesel::PgConnection>;
 
     type ConnectionPool = bb8::Pool<Self::ConnectionManager>;
 
@@ -145,7 +145,7 @@ impl DatabasePooling for DieselAsync {
         let manager = Self::ConnectionManager::new(database_url);
         let pool = Self::ConnectionPool::builder()
             .max_size(max_size)
-            .queue_strategy(bb8::QueueStrategy::Lifo);
+            .queue_strategy(bb8::QueueStrategy::Fifo);
         pool.build(manager)
             .await
             .expect("Failed to create PostgreSQL connection pool")

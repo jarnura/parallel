@@ -417,76 +417,97 @@ async fn executor(
     #[cfg(feature = "diesel")] store: web::Data<pooling::DieselAsync>,
     #[cfg(feature = "async_diesel")] store: web::Data<pooling::DieselPureAsync>,
 ) -> impl Responder {
+    use tracing::Instrument;
     println!("main entering");
 
     let start_time = parallel::utils::current_time();
     let store = store.get_ref();
 
-    // let pi_1_async = tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 1));
-    // let pi_2_async = tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 2));
-    // let pi_3_async = tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 3));
-    // let pi_4_async = tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 4));
-    // let pi_5_async = tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 5));
-    let pi_6_async = Inserts::insert_pi_with_instrument(store, 6);
-    let pi_7_async = Inserts::insert_pi_with_instrument(store, 7);
-    let pi_8_async = Inserts::insert_pi_with_instrument(store, 8);
-    let pi_9_async = Inserts::insert_pi_with_instrument(store, 9);
-    let pi_10_async = Inserts::insert_pi_with_instrument(store, 10);
+    let pi_1_async =
+        tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 1).in_current_span());
+    let pi_2_async =
+        tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 2).in_current_span());
+    let pi_3_async =
+        tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 3).in_current_span());
+    let pi_4_async =
+        tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 4).in_current_span());
+    let pi_5_async =
+        tokio::spawn(Inserts::_insert_pi_with_instrument(store.clone(), 5).in_current_span());
+    // let pi_6_async = Inserts::insert_pi_with_instrument(store, 6);
+    // let pi_7_async = Inserts::insert_pi_with_instrument(store, 7);
+    // let pi_8_async = Inserts::insert_pi_with_instrument(store, 8);
+    // let pi_9_async = Inserts::insert_pi_with_instrument(store, 9);
+    // let pi_10_async = Inserts::insert_pi_with_instrument(store, 10);
     // let pi_11_async = Inserts::insert_pi_with_instrument(store, 11);
     // let pi_12_async = Inserts::insert_pi_with_instrument(store, 12);
-    actix_web::rt::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     let (
-        // pi_1_async,
-        // pi_2_async,
-        // pi_3_async,
-        // pi_4_async,
-        // pi_5_async,
-        pi_6_async,
-        pi_7_async,
-        pi_8_async,
-        pi_9_async,
-        pi_10_async,
+        pi_1_async,
+        pi_2_async,
+        pi_3_async,
+        pi_4_async,
+        pi_5_async,
+        // pi_6_async,
+        // pi_7_async,
+        // pi_8_async,
+        // pi_9_async,
+        // pi_10_async,
         // pi_11_async,
         // pi_12_async,
     ) = tokio::join!(
-        // pi_1_async, pi_2_async, pi_3_async, pi_4_async,
-        // pi_5_async,
+        pi_1_async, pi_2_async, pi_3_async, pi_4_async,
+        pi_5_async,
         // Inserts::insert_pi_with_instrument(store, 1),
         // Inserts::insert_pi_with_instrument(store, 2),
         // Inserts::insert_pi_with_instrument(store, 3),
         // Inserts::insert_pi_with_instrument(store, 4),
         // Inserts::insert_pi_with_instrument(store, 5),
-        pi_6_async,
-        pi_7_async,
-        pi_8_async,
-        pi_9_async,
-        pi_10_async,
+        // pi_6_async,
+        // pi_7_async,
+        // pi_8_async,
+        // pi_9_async,
+        // pi_10_async,
         // pi_11_async,
         // pi_12_async
     );
 
     // actix_web::rt::time::sleep(tokio::time::Duration::from_millis(100)).await;
-    // let pi_1_async = tokio::spawn(Reads::_read_pi_with_instrument(store.clone(), pi_1_async.unwrap().payment_id, 1));
-    // let pi_2_async = tokio::spawn(Reads::_read_pi_with_instrument(store.clone(), pi_2_async.unwrap().payment_id, 2));
-    // let pi_3_async = tokio::spawn(Reads::_read_pi_with_instrument(store.clone(), pi_3_async.unwrap().payment_id, 3));
-    // let pi_4_async = tokio::spawn(Reads::_read_pi_with_instrument(store.clone(), pi_4_async.unwrap().payment_id, 4));
-    // let pi_5_async = tokio::spawn(Reads::_read_pi_with_instrument(store.clone(), pi_5_async.unwrap().payment_id, 5));
-    let pi_6_async = Reads::read_pi_with_instrument(store, pi_6_async.payment_id, 6);
-    let pi_7_async = Reads::read_pi_with_instrument(store, pi_7_async.payment_id, 7);
-    let pi_8_async = Reads::read_pi_with_instrument(store, pi_8_async.payment_id, 8);
-    let pi_9_async = Reads::read_pi_with_instrument(store, pi_9_async.payment_id, 9);
-    let pi_10_async = Reads::read_pi_with_instrument(store, pi_10_async.payment_id, 10);
+    let pi_1_async = tokio::spawn(
+        Reads::_read_pi_with_instrument(store.clone(), pi_1_async.unwrap().payment_id, 1)
+            .in_current_span(),
+    );
+    let pi_2_async = tokio::spawn(
+        Reads::_read_pi_with_instrument(store.clone(), pi_2_async.unwrap().payment_id, 2)
+            .in_current_span(),
+    );
+    let pi_3_async = tokio::spawn(
+        Reads::_read_pi_with_instrument(store.clone(), pi_3_async.unwrap().payment_id, 3)
+            .in_current_span(),
+    );
+    let pi_4_async = tokio::spawn(
+        Reads::_read_pi_with_instrument(store.clone(), pi_4_async.unwrap().payment_id, 4)
+            .in_current_span(),
+    );
+    let pi_5_async = tokio::spawn(
+        Reads::_read_pi_with_instrument(store.clone(), pi_5_async.unwrap().payment_id, 5)
+            .in_current_span(),
+    );
+    // let pi_6_async = Reads::read_pi_with_instrument(store, pi_6_async.payment_id, 6);
+    // let pi_7_async = Reads::read_pi_with_instrument(store, pi_7_async.payment_id, 7);
+    // let pi_8_async = Reads::read_pi_with_instrument(store, pi_8_async.payment_id, 8);
+    // let pi_9_async = Reads::read_pi_with_instrument(store, pi_9_async.payment_id, 9);
+    // let pi_10_async = Reads::read_pi_with_instrument(store, pi_10_async.payment_id, 10);
     // let pi_11_async = Reads::read_pi_with_instrument(store, pi_11_async.payment_id, 11);
     // let pi_12_async = Reads::read_pi_with_instrument(store, pi_12_async.payment_id, 12);
     // actix_web::rt::time::sleep(tokio::time::Duration::from_millis(100)).await;
     let _ = tokio::join!(
-        // pi_1_async, pi_2_async, pi_3_async, pi_4_async,
-        // pi_5_async,
-        pi_6_async,
-        pi_7_async,
-        pi_8_async,
-        pi_9_async,
-        pi_10_async,
+        pi_1_async, pi_2_async, pi_3_async, pi_4_async,
+        pi_5_async,
+        // pi_6_async,
+        // pi_7_async,
+        // pi_8_async,
+        // pi_9_async,
+        // pi_10_async,
         // pi_11_async,
         // pi_12_async
     );

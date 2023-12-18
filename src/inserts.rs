@@ -1,5 +1,6 @@
 #[cfg(feature = "diesel")]
-use crate::async_trait::AsyncRunQueryDsl;
+// use crate::async_trait::AsyncRunQueryDsl;
+use async_bb8_diesel::AsyncRunQueryDsl;
 
 #[cfg(any(feature = "diesel", feature = "async_diesel", feature = "sqlx"))]
 use crate::utils;

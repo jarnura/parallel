@@ -5,7 +5,8 @@ use crate::utils::instrument;
 use crate::{models, pooling};
 
 #[cfg(feature = "diesel")]
-use crate::async_trait::AsyncRunQueryDsl;
+// use crate::async_trait::AsyncRunQueryDsl;
+use async_bb8_diesel::AsyncRunQueryDsl;
 
 #[cfg(feature = "diesel")]
 use diesel::prelude::*;
@@ -41,7 +42,6 @@ impl Reads {
         instrument(|| Self::read_pi(store, pid), ix).await
     }
 
-    
     #[tracing::instrument(skip_all)]
     pub async fn _read_pi(store: pooling::DieselAsync, pid: String) -> models::PaymentIntent {
         use crate::schema::payment_intent::dsl::*;
